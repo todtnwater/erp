@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +35,9 @@ import java.util.Map;
 public class DataSeeder implements CommandLineRunner {
 
     private static final DateTimeFormatter TX_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /** CSV 시연 데이터의 기준일. 초기화하는 날을 이 날짜로 보고 모든 날짜를 옮긴다 (언제 초기화해도 '오늘' 시나리오 유지) */
+    private static final LocalDate SEED_TODAY = LocalDate.of(2026, 11, 16);
 
     private final ProductDAO productDAO;
     private final InboundPlanDAO planDAO;
@@ -79,13 +83,14 @@ public class DataSeeder implements CommandLineRunner {
             byCode.put(p.getCode(), p);
         }
 
+        long shift = ChronoUnit.DAYS.between(SEED_TODAY, LocalDate.now());
         Map<String, InboundPlanDTO> planByKey = new HashMap<>();
         for (String[] row : readCsv("inbound_plan.csv")) {
             ProductDTO product = byCode.get(row[1]);
             if (product == null) {
                 continue;
             }
-            InboundPlanDTO plan = new InboundPlanDTO(LocalDate.parse(row[0]), product.getId(),
+            InboundPlanDTO plan = new InboundPlanDTO(LocalDate.parse(row[0]).plusDays(shift), product.getId(),
                     Integer.parseInt(row[2]), Integer.parseInt(row[3]), row[4]);
             planDAO.insert(plan);
             planByKey.put(row[0] + "|" + row[1], plan);
@@ -101,7 +106,7 @@ public class DataSeeder implements CommandLineRunner {
             StockTxDTO tx = new StockTxDTO(product.getId(), plan == null ? null : plan.getId(), row[2],
                     Integer.parseInt(row[3]), Integer.parseInt(row[4]), Integer.parseInt(row[5]),
                     row[6], row[7], null, row[8]);
-            tx.setCreatedAt(LocalDateTime.parse(row[0], TX_TIME));
+            tx.setCreatedAt(LocalDateTime.parse(row[0], TX_TIME).plusDays(shift));
             stockTxDAO.insert(tx);
         }
     }

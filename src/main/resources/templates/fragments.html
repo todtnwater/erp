@@ -264,6 +264,20 @@
         openBtn.addEventListener('click', () => setChatOpen(true));
         setChatOpen(load('erpChatOpen') !== '0');
 
+        /** JSON 대신 HTML(시간 초과·서버 꺼짐 페이지)이 오면 상태 코드로 알려 준다 */
+        async function readJson(res) {
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                const why = res.status === 524 ? 'AI 응답이 100초를 넘어 Cloudflare가 연결을 끊었습니다. 질문을 짧게 다시 해 주세요.'
+                    : (res.status === 502 || res.status === 530) ? 'ERP 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'
+                    : (res.status === 401 || text.indexOf('login') >= 0) ? '로그인이 풀렸습니다. 새로고침 후 다시 로그인하세요.'
+                    : '서버가 예상과 다른 응답을 보냈습니다.';
+                return {error: why + ' (HTTP ' + res.status + ')'};
+            }
+        }
+
         function esc(s) {
             return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -371,7 +385,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({reasonCode: reasonCode})
                 });
-                const data = await res.json();
+                const data = await readJson(res);
                 if (!res.ok) {
                     throw new Error(data.error || '처리 실패');
                 }
@@ -494,7 +508,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({message: msg, history: history.filter(m => !m.local).slice(-6).map(m => ({role: m.role, content: m.content}))})
                 });
-                const data = await res.json();
+                const data = await readJson(res);
                 if (!res.ok) {
                     throw new Error(data.error || '오류가 발생했습니다.');
                 }
