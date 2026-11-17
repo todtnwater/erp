@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('상품 마스터')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('products')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>상품 마스터</h1>
+                <div class="desc">품목·산지·포장 단위·팔레트 적재 기준. 입고 검증(단위 환산, 창고 용량)의 기준 데이터</div>
+            </div>
+            <input id="prodSearch" type="search" placeholder="코드·이름·산지 검색" style="min-width:220px">
+        </div>
+
+        <div class="card">
+            <div class="form" style="margin-bottom:12px">
+                <a th:href="@{/products}"><button type="button" th:class="${cat == ''} ? '' : 'ghost'" th:text="'전체 ' + ${total}">전체</button></a>
+                <a th:each="c : ${categories}" th:href="@{/products(cat=${c})}">
+                    <button type="button" th:class="${cat == c} ? '' : 'ghost'" th:text="${c}">귤</button>
+                </a>
+            </div>
+            <div class="table-wrap">
+                <table id="prodTable">
+                    <thead>
+                    <tr>
+                        <th>코드</th>
+                        <th>상품명</th>
+                        <th>품목</th>
+                        <th>산지</th>
+                        <th>단위</th>
+                        <th>kg/상자</th>
+                        <th>상자/팔레트</th>
+                        <th>안전재고</th>
+                        <th>보관 위치</th>
+                        <th>검색 키워드 (AI 상품 매칭용)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="p : ${products}">
+                        <td th:text="${p.code}">MK-EHM</td>
+                        <td th:text="${p.name}">상품</td>
+                        <td th:text="${p.category}">귤</td>
+                        <td th:text="${p.origin}">愛媛</td>
+                        <td th:text="${p.unit}">상자</td>
+                        <td class="num" th:text="${p.kgPerBox}">10</td>
+                        <td class="num" th:text="${p.boxesPerPallet}">54</td>
+                        <td class="num" th:text="${p.safetyQty}">0</td>
+                        <td th:text="${p.location}">C2-01</td>
+                        <td class="muted" th:text="${p.description}">설명</td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(products)}">
+                        <td colspan="10" class="muted">상품이 없습니다.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="rule">
+                · 팔레트: T11(1100×1100) 1장 = 540kg 기준 → 10kg 상자 54개, 20kg 상자 27개<br>
+                · kg으로 입고 요청이 들어오면 kg/상자로 나눠 상자 수로 환산합니다 (예: 830kg ÷ 10kg = 83상자)<br>
+                · 검색 키워드는 Python AI 서비스가 bge-m3로 임베딩해 Qdrant에 저장, "에히메 귤"처럼 애매한 이름을 상품 코드로 찾는 데 씁니다
+            </div>
+        </div>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<script th:inline="none">
+    document.addEventListener('input', e => {
+        if (e.target.id !== 'prodSearch') {
+            return;
+        }
+        const k = e.target.value.trim().toLowerCase();
+        document.querySelectorAll('#prodTable tbody tr').forEach(tr => {
+            tr.style.display = !k || tr.textContent.toLowerCase().indexOf(k) >= 0 ? '' : 'none';
+        });
+    });
+</script>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

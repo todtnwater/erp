@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ssk.erp.dao.InboundPlanDAO">
+
+    <sql id="columns">
+        pl.id, pl.plan_date, pl.product_id, p.code AS product_code, p.name AS product_name,
+        pl.planned_qty, pl.received_qty, pl.source, pl.updated_at
+    </sql>
+
+    <select id="findByProductAndDate" resultType="com.ssk.erp.dto.InboundPlanDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_inbound_plan pl
+        JOIN erp_product p ON p.id = pl.product_id
+        WHERE pl.product_id = #{productId}
+          AND pl.plan_date = #{planDate}
+    </select>
+
+    <select id="findBetween" resultType="com.ssk.erp.dto.InboundPlanDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_inbound_plan pl
+        JOIN erp_product p ON p.id = pl.product_id
+        WHERE pl.plan_date BETWEEN #{from} AND #{to}
+        ORDER BY pl.plan_date, p.code
+    </select>
+
+    <select id="findByIdForUpdate" resultType="com.ssk.erp.dto.InboundPlanDTO">
+        SELECT pl.id, pl.plan_date, pl.product_id, pl.planned_qty, pl.received_qty, pl.source, pl.updated_at
+        FROM erp_inbound_plan pl
+        WHERE pl.id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="addReceived">
+        UPDATE erp_inbound_plan
+        SET received_qty = received_qty + #{qty},
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <update id="updatePlan">
+        UPDATE erp_inbound_plan
+        SET planned_qty = #{plannedQty},
+            source = #{source},
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insert" parameterType="com.ssk.erp.dto.InboundPlanDTO" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO erp_inbound_plan (plan_date, product_id, planned_qty, received_qty, source, updated_at)
+        VALUES (#{planDate}, #{productId}, #{plannedQty}, #{receivedQty}, #{source}, SYSTIMESTAMP)
+    </insert>
+</mapper>

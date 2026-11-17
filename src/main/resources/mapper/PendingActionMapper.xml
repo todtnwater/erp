@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ssk.erp.dao.PendingActionDAO">
+
+    <insert id="insert" parameterType="com.ssk.erp.dto.PendingActionDTO">
+        INSERT INTO erp_pending_action (id, action_type, product_id, plan_id, qty, before_qty, after_qty,
+                                        exception_flag, warning, actor, status, memo, created_at, expires_at)
+        VALUES (#{id}, #{actionType}, #{productId}, #{planId, jdbcType=NUMERIC}, #{qty}, #{beforeQty}, #{afterQty},
+                #{exceptionFlag}, #{warning, jdbcType=VARCHAR}, #{actor}, #{status}, #{memo, jdbcType=VARCHAR},
+                #{createdAt}, #{expiresAt})
+    </insert>
+
+    <select id="findById" resultType="com.ssk.erp.dto.PendingActionDTO">
+        SELECT id, action_type, product_id, plan_id, qty, before_qty, after_qty, exception_flag,
+               warning, actor, status, memo, created_at, expires_at, decided_at
+        FROM erp_pending_action
+        WHERE id = #{id}
+    </select>
+
+    <update id="transition">
+        UPDATE erp_pending_action
+        SET status = #{to},
+            decided_at = #{now}
+        WHERE id = #{id}
+          AND status = 'PENDING'
+          AND expires_at &gt; #{now}
+    </update>
+</mapper>

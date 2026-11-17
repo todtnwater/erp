@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ssk.erp.dao.UserDAO">
+
+    <sql id="columns">
+        id, login_id, password_hash, name, is_admin, enabled, created_at, last_login_at
+    </sql>
+
+    <select id="findByLoginId" resultType="com.ssk.erp.dto.UserDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_user
+        WHERE login_id = #{loginId}
+    </select>
+
+    <select id="findById" resultType="com.ssk.erp.dto.UserDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultType="com.ssk.erp.dto.UserDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_user
+        ORDER BY is_admin DESC, id
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM erp_user
+    </select>
+
+    <select id="countAdmins" resultType="int">
+        SELECT COUNT(*) FROM erp_user WHERE is_admin = 1 AND enabled = 1
+    </select>
+
+    <insert id="insert" parameterType="com.ssk.erp.dto.UserDTO" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO erp_user (login_id, password_hash, name, is_admin, enabled, created_at)
+        VALUES (#{loginId}, #{passwordHash}, #{name}, #{isAdmin}, #{enabled}, #{createdAt})
+    </insert>
+
+    <update id="updateLastLogin">
+        UPDATE erp_user SET last_login_at = #{now} WHERE id = #{id}
+    </update>
+
+    <update id="updateAdmin">
+        UPDATE erp_user SET is_admin = #{isAdmin} WHERE id = #{id}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE erp_user SET enabled = #{enabled} WHERE id = #{id}
+    </update>
+
+    <update id="updateName">
+        UPDATE erp_user SET name = #{name} WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE erp_user SET password_hash = #{passwordHash} WHERE id = #{id}
+    </update>
+</mapper>

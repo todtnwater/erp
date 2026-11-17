@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('입출고 이력')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('history')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>입출고 이력 (감사 로그)</h1>
+                <div class="desc">누가 · 언제 · 어떤 경로(화면/AI)로 · 어떤 사유로 재고를 바꿨는지 전부 남습니다. 수정·삭제 기능 없음</div>
+            </div>
+            <button type="button" class="ghost" id="csvBtn">⬇ CSV 내려받기</button>
+        </div>
+
+        <div class="kpis">
+            <div class="kpi">
+                <div class="label">입고 합계</div>
+                <div class="value"><span th:text="${#numbers.formatInteger(inSum, 1, 'COMMA')}">0</span><small class="muted"> 상자</small></div>
+            </div>
+            <div class="kpi">
+                <div class="label">출고 합계</div>
+                <div class="value"><span th:text="${#numbers.formatInteger(outSum, 1, 'COMMA')}">0</span><small class="muted"> 상자</small></div>
+            </div>
+            <div class="kpi">
+                <div class="label">AI 경유 (승인 후 반영)</div>
+                <div class="value" th:text="${aiCount} + '건'">0건</div>
+            </div>
+            <div class="kpi" th:classappend="${exceptionCount > 0} ? 'alert' : ''">
+                <div class="label">예외 입고 (관리자 + 사유)</div>
+                <div class="value" th:text="${exceptionCount} + '건'">0건</div>
+            </div>
+        </div>
+
+        <section class="card">
+            <form class="form" th:action="@{/history}" method="get" style="margin-bottom:12px">
+                <select name="days">
+                    <option value="1" th:selected="${days == 1}">오늘·어제</option>
+                    <option value="7" th:selected="${days == 7}">최근 7일</option>
+                    <option value="30" th:selected="${days == 30}">최근 30일</option>
+                    <option value="90" th:selected="${days == 90}">최근 90일</option>
+                </select>
+                <select name="type">
+                    <option value="" th:selected="${type == ''}">입고+출고</option>
+                    <option value="IN" th:selected="${type == 'IN'}">입고</option>
+                    <option value="OUT" th:selected="${type == 'OUT'}">출고</option>
+                </select>
+                <select name="channel">
+                    <option value="" th:selected="${channel == ''}">전체 경로</option>
+                    <option value="UI" th:selected="${channel == 'UI'}">화면 (UI)</option>
+                    <option value="AI" th:selected="${channel == 'AI'}">AI 도우미</option>
+                </select>
+                <label class="muted"><input type="checkbox" name="exceptionOnly" value="true" th:checked="${exceptionOnly}"> 예외 입고만</label>
+                <input type="text" name="q" th:value="${q}" maxlength="40" placeholder="상품·처리자·메모">
+                <button type="submit">조회</button>
+            </form>
+            <div class="table-wrap">
+                <table id="txTable">
+                    <thead>
+                    <tr>
+                        <th>번호</th>
+                        <th>일시</th>
+                        <th>상품</th>
+                        <th>구분</th>
+                        <th>상자</th>
+                        <th>변경 전 → 후</th>
+                        <th>경로</th>
+                        <th>처리자</th>
+                        <th>예외 사유</th>
+                        <th>메모</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="t : ${txs}">
+                        <td class="num" th:text="${t.id}">1</td>
+                        <td th:text="${#temporals.format(t.createdAt, 'yyyy-MM-dd HH:mm')}">2026-11-16 10:00</td>
+                        <td th:text="${t.productCode + ' ' + t.productName}">상품</td>
+                        <td><span class="badge" th:classappend="${t.txType}" th:text="${t.txType == 'IN'} ? '입고' : '출고'">입고</span></td>
+                        <td class="num" th:text="${t.qty}">0</td>
+                        <td th:text="${t.beforeQty + ' → ' + t.afterQty}">0 → 0</td>
+                        <td><span class="badge" th:classappend="${t.channel}" th:text="${t.channel}">UI</span></td>
+                        <td th:text="${t.actor}">담당자</td>
+                        <td><span th:if="${t.reasonCode}" class="badge reason"
+                                  th:text="${reasonCodes.get(t.reasonCode) != null ? reasonCodes.get(t.reasonCode) : t.reasonCode}">사유</span></td>
+                        <td th:text="${t.memo}">메모</td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(txs)}">
+                        <td colspan="10" class="muted">조회 조건에 맞는 이력이 없습니다.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<script th:inline="none">
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#csvBtn')) {
+            return;
+        }
+        const rows = [];
+        document.querySelectorAll('#txTable tr').forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('th, td'));
+            if (cells.length < 2) {
+                return;
+            }
+            rows.push(cells.map(c => '"' + c.textContent.trim().replace(/"/g, '""') + '"').join(','));
+        });
+        const blob = new Blob(['﻿' + rows.join('\r\n')], {type: 'text/csv;charset=utf-8'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'erp_stock_history_' + new Date().toISOString().slice(0, 10) + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+</script>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

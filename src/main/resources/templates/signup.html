@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('회원가입')}"></head>
+<body>
+<style>
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;
+        background: linear-gradient(135deg, #111827 0%, #1f2937 60%, #1f6feb 140%); }
+    .login-card { width: 100%; max-width: 400px; background: #fff; border-radius: 14px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+    .login-card h1 { margin: 0; font-size: 22px; }
+    .login-card .sub { color: var(--muted); font-size: 13px; margin: 6px 0 20px; }
+    .login-card label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+    .login-card input { width: 100%; padding: 10px 12px; }
+    .login-card button { width: 100%; margin-top: 18px; padding: 11px; font-size: 15px; }
+    .login-note { margin-top: 16px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+</style>
+<div class="login-wrap">
+    <form class="login-card" th:action="@{/signup}" method="post" autocomplete="off">
+        <h1>회원가입</h1>
+        <div class="sub">Smart ERP · 도쿄 청과 냉장센터</div>
+        <div th:if="${flashError}" class="flash err" th:text="${flashError}">오류</div>
+        <label for="loginId">아이디 (영문 소문자·숫자·_ 3~20자)</label>
+        <input id="loginId" name="loginId" type="text" maxlength="20" pattern="[a-z0-9_]{3,20}" required autofocus
+               th:value="${loginId}" autocomplete="username">
+        <label for="name">이름 (처리자로 이력에 남는 이름)</label>
+        <input id="name" name="name" type="text" maxlength="30" required th:value="${name}">
+        <label for="password">비밀번호 (8자 이상)</label>
+        <input id="password" name="password" type="password" minlength="8" maxlength="64" required autocomplete="new-password">
+        <label for="passwordConfirm">비밀번호 확인</label>
+        <input id="passwordConfirm" name="passwordConfirm" type="password" minlength="8" maxlength="64" required autocomplete="new-password">
+        <button type="submit">가입 신청</button>
+        <div style="text-align:center;margin-top:12px;font-size:13px">
+            이미 계정이 있으신가요? <a th:href="@{/login}">로그인</a>
+        </div>
+        <div class="login-note">
+            · 가입하면 <b>현장 직원</b>, <b>승인 대기</b> 상태로 만들어집니다<br>
+            · 관리자가 사용자 관리에서 승인해야 로그인할 수 있습니다 (아무나 가입해서 재고를 바꾸지 못하게)
+        </div>
+    </form>
+</div>
+</body>
+</html>

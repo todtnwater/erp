@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('내 정보')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('me')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>내 정보</h1>
+                <div class="desc">이름과 비밀번호를 바꿀 수 있습니다. 권한은 관리자만 바꿀 수 있습니다</div>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments :: flash}"></div>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>계정</h2>
+                <table>
+                    <tbody>
+                    <tr>
+                        <th style="width:140px">아이디</th>
+                        <td th:text="${loginUser.loginId()}">admin</td>
+                    </tr>
+                    <tr>
+                        <th>이름</th>
+                        <td th:text="${loginUser.name()}">관리자</td>
+                    </tr>
+                    <tr>
+                        <th>권한</th>
+                        <td><span class="role-badge" th:classappend="${loginUser.admin()} ? 'admin' : 'staff'"
+                                  th:text="${loginUser.admin()} ? '관리자 · 예외 입고 승인 가능' : '현장 직원 · 예정 범위 입고만'">직원</span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h2>정보 수정</h2>
+                <form th:action="@{/me}" method="post" autocomplete="off" style="display:flex;flex-direction:column;gap:10px">
+                    <label class="muted">이름
+                        <input type="text" name="name" maxlength="30" required th:value="${loginUser.name()}" style="width:100%">
+                    </label>
+                    <label class="muted">새 비밀번호 (바꾸지 않으려면 비워 두세요)
+                        <input type="password" name="newPassword" maxlength="64" autocomplete="new-password" style="width:100%">
+                    </label>
+                    <label class="muted">새 비밀번호 확인
+                        <input type="password" name="newPasswordConfirm" maxlength="64" autocomplete="new-password" style="width:100%">
+                    </label>
+                    <label class="muted">현재 비밀번호 (저장하려면 필수)
+                        <input type="password" name="currentPassword" maxlength="64" required autocomplete="current-password" style="width:100%">
+                    </label>
+                    <button type="submit">저장</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

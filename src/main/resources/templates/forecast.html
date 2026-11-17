@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('입하량 예측')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('forecast')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>입하량 예측 (랜덤포레스트)</h1>
+                <div class="desc">도쿄 중앙도매시장 일별 입하량(ベジ探)으로 학습 → 앞으로 2주 시장 입하량 예측 → 당사 점유율 0.5%로 입고 예정 산출</div>
+            </div>
+            <div class="form" id="fcTabs">
+                <button type="button" class="fc-tab" data-item="귤" data-kg="10">🍊 귤</button>
+                <button type="button" class="fc-tab ghost" data-item="사과" data-kg="10">🍎 사과</button>
+                <button type="button" class="fc-tab ghost" data-item="양파" data-kg="20">🧅 양파</button>
+            </div>
+        </div>
+
+        <section class="card">
+            <h2><span id="fcTitle">귤 시장 입하량 예측</span>
+                <span class="muted">Python AI 서비스 (학원 5070 Ti) · scikit-learn RandomForest · 휴무일(수·일·공휴일)은 0</span>
+            </h2>
+            <div id="fcStatus" class="muted">예측을 불러오는 중입니다</div>
+            <div style="position:relative;height:300px;margin-top:8px">
+                <canvas id="fcChart"></canvas>
+            </div>
+        </section>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>예측 상세</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>날짜</th>
+                            <th>요일</th>
+                            <th>시장 예측(톤)</th>
+                            <th>당사 0.5%(kg)</th>
+                            <th>예상 상자</th>
+                            <th>팔레트</th>
+                        </tr>
+                        </thead>
+                        <tbody id="fcBody">
+                        <tr>
+                            <td colspan="6" class="muted">-</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>ERP에 등록된 입고 예정 (2주) <a th:href="@{/inbound}" class="muted">입고 화면 →</a></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>예정일</th>
+                            <th>전 품목 예정 상자</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="e : ${byDate}" th:classappend="${e.key == today} ? 'today' : ''">
+                            <td th:text="${#temporals.format(e.key, 'MM-dd (E)')}">11-16</td>
+                            <td class="num" th:text="${e.value}">0</td>
+                        </tr>
+                        <tr th:if="${#maps.isEmpty(byDate)}">
+                            <td colspan="2" class="muted">등록된 입고 예정이 없습니다.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="rule">
+                    · 출처 BASELINE = 전년 같은 요일 입하량 기반 초기값<br>
+                    · Python 노트북(erp_forecast.ipynb)에서 PUSH=True로 실행하면 RF_MODEL 예측값으로 교체됩니다<br>
+                    · 이미 입고된 실적(입고 수량)은 예측을 다시 돌려도 유지됩니다
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script th:inline="none">
+    (() => {
+        let chart = null;
+        let current = {item: '귤', kg: 10};
+        let seq = 0;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+
+        function draw(rows) {
+            const canvas = document.getElementById('fcChart');
+            if (!canvas || typeof Chart === 'undefined') {
+                return;
+            }
+            if (chart) {
+                chart.destroy();
+            }
+            chart = new Chart(canvas, {
+                data: {
+                    labels: rows.map(r => r.date.slice(5) + ' ' + r.weekday),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: '시장 입하량 예측 (톤)',
+                            data: rows.map(r => r.market_pred_ton),
+                            backgroundColor: '#93b4f5',
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'line',
+                            label: '당사 예상 입고 (상자)',
+                            data: rows.map(r => Math.round(r.our_share_kg / current.kg)),
+                            borderColor: '#b42318',
+                            backgroundColor: '#b42318',
+                            tension: 0.25,
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {mode: 'index', intersect: false},
+                    scales: {
+                        y: {position: 'left', beginAtZero: true, title: {display: true, text: '톤'}},
+                        y2: {position: 'right', beginAtZero: true, grid: {drawOnChartArea: false}, title: {display: true, text: '상자'}}
+                    }
+                }
+            });
+        }
+
+        function fill(rows) {
+            const body = document.getElementById('fcBody');
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="6" class="muted">예측 결과가 없습니다.</td></tr>';
+                return;
+            }
+            const perPallet = current.kg === 20 ? 27 : 54;
+            body.innerHTML = rows.map(r => {
+                const boxes = Math.round(r.our_share_kg / current.kg);
+                const closed = r.market_pred_ton === 0;
+                return '<tr' + (closed ? ' style="color:#9ca3af"' : '') + '>' +
+                    '<td>' + esc(r.date) + '</td>' +
+                    '<td>' + esc(r.weekday) + (closed ? ' (휴무)' : '') + '</td>' +
+                    '<td class="num">' + esc(r.market_pred_ton) + '</td>' +
+                    '<td class="num">' + esc(r.our_share_kg.toLocaleString()) + '</td>' +
+                    '<td class="num">' + boxes + '</td>' +
+                    '<td class="num">' + Math.ceil(boxes / perPallet) + '</td></tr>';
+            }).join('');
+        }
+
+        async function load() {
+            const status = document.getElementById('fcStatus');
+            if (!status) {
+                return;
+            }
+            document.getElementById('fcTitle').textContent = current.item + ' 시장 입하량 예측 (향후 14 영업일)';
+            document.querySelectorAll('.fc-tab').forEach(b => b.classList.toggle('ghost', b.dataset.item !== current.item));
+            status.textContent = '예측을 불러오는 중입니다 (첫 호출은 모델 학습 때문에 10~30초 걸릴 수 있음)';
+            const my = ++seq;
+            try {
+                const res = await fetch('/api/forecast/' + encodeURIComponent(current.item) + '?days=14');
+                const data = await res.json();
+                if (my !== seq) {
+                    return;
+                }
+                if (!res.ok) {
+                    throw new Error(data.error || '예측 실패');
+                }
+                const rows = Array.isArray(data) ? data : [];
+                const total = rows.reduce((s, r) => s + Math.round(r.our_share_kg / current.kg), 0);
+                status.textContent = '14 영업일 합계 예상 입고 ' + total.toLocaleString() + '상자'
+                    + (typeof Chart === 'undefined' ? ' · (그래프 라이브러리를 불러오지 못해 표만 표시)' : '');
+                fill(rows);
+                draw(rows);
+            } catch (e) {
+                if (my !== seq) {
+                    return;
+                }
+                status.textContent = 'AI 서비스에 연결할 수 없습니다: ' + e.message + ' · 입고 예정(오른쪽 표)은 DB 값으로 계속 사용 가능';
+                fill([]);
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+            }
+        }
+
+        document.addEventListener('click', e => {
+            const tab = e.target.closest('.fc-tab');
+            if (!tab) {
+                return;
+            }
+            current = {item: tab.dataset.item, kg: Number(tab.dataset.kg)};
+            load();
+        });
+
+        window.erpPageInit = () => {
+            chart = null;
+            load();
+        };
+    })();
+</script>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

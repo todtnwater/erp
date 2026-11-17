@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('대시보드')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('dashboard')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>대시보드</h1>
+                <div class="desc" th:text="${#temporals.format(today, 'yyyy-MM-dd (E)')} + ' · 오늘 해야 할 일과 확인이 필요한 항목'">2026-11-16</div>
+            </div>
+            <div class="form">
+                <a th:href="@{/inbound}"><button type="button">📥 입고 처리</button></a>
+                <a th:href="@{/outbound}"><button type="button" class="ghost">📤 출고 처리</button></a>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments :: flash}"></div>
+
+        <div class="kpis">
+            <div class="kpi">
+                <div class="label">총 재고</div>
+                <div class="value"><span th:text="${#numbers.formatInteger(totalBoxes, 1, 'COMMA')}">0</span><small class="muted"> 상자</small></div>
+                <div class="sub" th:text="${totalTon} + ' 톤 · ' + ${#lists.size(products)} + '개 품목'">0 톤</div>
+            </div>
+            <div class="kpi" th:classappend="${usage.percent() >= 80} ? 'alert' : ''">
+                <div class="label">냉장 창고 사용률</div>
+                <div class="value" th:text="${usage.percent()} + '%'">0%</div>
+                <div class="sub" th:text="${usage.usedPallets()} + ' / ' + ${usage.capacity()} + ' 팔레트 · 운영 상한 80%'">0 / 82</div>
+            </div>
+            <div class="kpi">
+                <div class="label">오늘 입고 진행</div>
+                <div class="value"><span th:text="${todayDone}">0</span><small class="muted" th:text="' / ' + ${#lists.size(todayPlans)} + ' 건 완료'"> / 0</small></div>
+                <div class="sub" th:text="'입고 ' + ${todayReceived} + ' / 예정 ' + ${todayPlanned} + ' 상자 · 출고 ' + ${todayOut} + ' 상자'">0</div>
+            </div>
+            <div class="kpi" th:classappend="${#lists.size(lowList) + #lists.size(missed) > 0} ? 'alert' : ''">
+                <div class="label">확인 필요</div>
+                <div class="value" th:text="${#lists.size(lowList) + #lists.size(missed)} + '건'">0건</div>
+                <div class="sub" th:text="'재고 부족 ' + ${#lists.size(lowList)} + ' · 미입고/부분 ' + ${#lists.size(missed)} + ' · 7일 예외 입고 ' + ${exceptions7d}">0</div>
+            </div>
+        </div>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>오늘 입고 예정 <a th:href="@{/inbound}" class="muted">전체 보기 →</a></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>상품</th>
+                            <th>예정</th>
+                            <th>입고</th>
+                            <th>잔량</th>
+                            <th>상태</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="pl : ${todayPlans}">
+                            <td th:text="${pl.productCode + ' ' + pl.productName}">상품</td>
+                            <td class="num" th:text="${pl.plannedQty}">0</td>
+                            <td class="num" th:text="${pl.receivedQty}">0</td>
+                            <td class="num" th:text="${pl.remaining}">0</td>
+                            <td><span class="badge" th:classappend="${'st-' + pl.statusOn(today)}" th:text="${pl.statusLabelOn(today)}">예정</span></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(todayPlans)}">
+                            <td colspan="5" class="muted">오늘은 입고 예정이 없습니다. (시장 휴무일일 수 있음)</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>확인이 필요한 항목 <span class="muted">최근 7일</span></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>구분</th>
+                            <th>상품</th>
+                            <th>내용</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="pl : ${missed}">
+                            <td><span class="badge" th:classappend="${'st-' + pl.statusOn(today)}" th:text="${pl.statusLabelOn(today)}">미입고</span></td>
+                            <td th:text="${pl.productCode + ' ' + pl.productName}">상품</td>
+                            <td th:text="${#temporals.format(pl.planDate, 'MM-dd (E)')} + ' 예정 ' + ${pl.plannedQty} + ' 중 ' + ${pl.receivedQty} + ' 입고'">내용</td>
+                        </tr>
+                        <tr th:each="p : ${lowList}" class="low">
+                            <td><span class="badge low">재고 부족</span></td>
+                            <td th:text="${p.code + ' ' + p.name}">상품</td>
+                            <td th:text="'현재 ' + ${p.stockQty} + ' / 안전재고 ' + ${p.safetyQty} + ' 상자'">내용</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(missed) and #lists.isEmpty(lowList)}">
+                            <td colspan="3" class="muted">확인할 항목이 없습니다.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>품목별 창고 점유 <span class="muted">T11 팔레트 기준</span></h2>
+                <div th:each="c : ${usage.byCategory()}" style="margin-bottom:12px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                        <span th:text="${c.key}">귤</span>
+                        <span class="muted" th:text="${c.value} + ' 팔레트'">0</span>
+                    </div>
+                    <div class="bar">
+                        <div th:style="|width: ${c.value * 100 / usage.capacity()}%|"></div>
+                    </div>
+                </div>
+                <div class="usage" style="margin-top:16px">
+                    <span class="muted">전체</span>
+                    <div class="bar" th:classappend="${usage.percent() >= 80} ? 'hot' : ''">
+                        <div th:style="|width: ${usage.percent() > 100 ? 100 : usage.percent()}%|"></div>
+                    </div>
+                    <b th:text="${usage.percent()} + '%'">0%</b>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>최근 입출고 <a th:href="@{/history}" class="muted">이력 전체 →</a></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>일시</th>
+                            <th>상품</th>
+                            <th>구분</th>
+                            <th>상자</th>
+                            <th>경로</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="t : ${recentTx}">
+                            <td th:text="${#temporals.format(t.createdAt, 'MM-dd HH:mm')}">11-16 10:00</td>
+                            <td th:text="${t.productCode + ' ' + t.productName}">상품</td>
+                            <td><span class="badge" th:classappend="${t.txType}" th:text="${t.txType == 'IN'} ? '입고' : '출고'">입고</span></td>
+                            <td class="num" th:text="${t.qty}">0</td>
+                            <td><span class="badge" th:classappend="${t.channel}" th:text="${t.channel}">UI</span>
+                                <span th:if="${t.reasonCode}" class="badge reason">예외</span></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(recentTx)}">
+                            <td colspan="5" class="muted">최근 7일 이력이 없습니다.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

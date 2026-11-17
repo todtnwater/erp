@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('입고 예정 · 입고 처리')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('inbound')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>입고 예정 · 입고 처리</h1>
+                <div class="desc">입고는 반드시 오늘 입고 예정과 비교해서 검증됩니다. 화면에서 넣든 AI로 넣든 같은 규칙</div>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments :: flash}"></div>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>입고 처리 <span class="muted">오늘 예정 행의 [입력] 버튼을 누르면 자동 채움</span></h2>
+                <form id="inForm" class="form" th:action="@{/stock}" method="post">
+                    <input type="hidden" name="txType" value="IN">
+                    <input type="hidden" name="back" value="/inbound">
+                    <select name="productId" required>
+                        <option th:each="p : ${products}" th:value="${p.id}" th:text="${p.code + ' ' + p.name}">상품</option>
+                    </select>
+                    <input type="number" name="qty" min="1" max="10000" placeholder="상자 수" required>
+                    <select name="reasonCode">
+                        <option value="">예외 사유 (예외 입고 시)</option>
+                        <option th:each="e : ${reasonCodes}" th:value="${e.key}" th:text="${e.value}">사유</option>
+                    </select>
+                    <input type="text" name="memo" maxlength="100" placeholder="메모 (사유 '기타'면 필수)">
+                    <button type="submit">입고 등록</button>
+                </form>
+                <div class="muted" style="margin-top:8px">처리자 <b th:text="${loginUser.name()}">이름</b>
+                    <span class="role-badge" th:classappend="${loginUser.admin()} ? 'admin' : 'staff'"
+                          th:text="${loginUser.admin()} ? '관리자 · 예외 입고 가능' : '현장 직원 · 예외 입고 불가'">직원</span></div>
+                <div class="rule">
+                    ✅ 예정 잔량 ±<b th:text="${tolerancePct}">10</b>% 이내 → 현장 직원이 바로 처리<br>
+                    ⚠️ 예정보다 적게 → 부분 입고로 처리, 나머지는 미입고로 남음<br>
+                    ⛔ 예정 초과 · 예정 없음 → <b>관리자 권한 + 사유코드</b>가 있어야 처리 (예외 입고)<br>
+                    ⛔ 창고 82팔레트 초과 → 누구도 처리 불가 · 최근 7일 평균의 3배 이상이면 경고
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>오늘 입고 예정 <span class="muted" th:text="${#temporals.format(today, 'MM-dd (E)')}">11-16</span></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>상품</th>
+                            <th>예정</th>
+                            <th>입고</th>
+                            <th>잔량</th>
+                            <th>상태</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="pl : ${todayPlans}">
+                            <td th:text="${pl.productCode + ' ' + pl.productName}">상품</td>
+                            <td class="num" th:text="${pl.plannedQty}">0</td>
+                            <td class="num" th:text="${pl.receivedQty}">0</td>
+                            <td class="num" th:text="${pl.remaining}">0</td>
+                            <td><span class="badge" th:classappend="${'st-' + pl.statusOn(today)}" th:text="${pl.statusLabelOn(today)}">예정</span></td>
+                            <td>
+                                <button type="button" class="small ghost fill-in"
+                                        th:if="${pl.remaining > 0}"
+                                        th:attr="data-product=${pl.productId},data-qty=${pl.remaining}">입력</button>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(todayPlans)}">
+                            <td colspan="6" class="muted">오늘은 입고 예정이 없습니다.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <section class="card">
+            <h2>입고 예정 대비 실적
+                <span class="muted">예정 출처: BASELINE(전년 동요일 기반) · RF_MODEL(랜덤포레스트 예측)</span>
+            </h2>
+            <form class="form" th:action="@{/inbound}" method="get" style="margin-bottom:12px">
+                <input type="date" name="from" th:value="${from}">
+                <span class="muted">~</span>
+                <input type="date" name="to" th:value="${to}">
+                <select name="status">
+                    <option value="" th:selected="${status == ''}">전체 상태</option>
+                    <option value="PLANNED" th:selected="${status == 'PLANNED'}" th:text="'예정 (' + ${counts['PLANNED']} + ')'">예정</option>
+                    <option value="PARTIAL" th:selected="${status == 'PARTIAL'}" th:text="'부분입고 (' + ${counts['PARTIAL']} + ')'">부분입고</option>
+                    <option value="DONE" th:selected="${status == 'DONE'}" th:text="'완료 (' + ${counts['DONE']} + ')'">완료</option>
+                    <option value="MISSED" th:selected="${status == 'MISSED'}" th:text="'미입고 (' + ${counts['MISSED']} + ')'">미입고</option>
+                </select>
+                <button type="submit">조회</button>
+                <a th:href="@{/inbound(status='MISSED')}"><button type="button" class="ghost">미입고만</button></a>
+            </form>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>예정일</th>
+                        <th>상품</th>
+                        <th>예정</th>
+                        <th>입고</th>
+                        <th>잔량</th>
+                        <th>달성률</th>
+                        <th>상태</th>
+                        <th>출처</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="pl : ${plans}" th:classappend="${pl.planDate == today} ? 'today' : ''">
+                        <td th:text="${#temporals.format(pl.planDate, 'MM-dd (E)')}">11-16</td>
+                        <td th:text="${pl.productCode + ' ' + pl.productName}">상품</td>
+                        <td class="num" th:text="${pl.plannedQty}">0</td>
+                        <td class="num" th:text="${pl.receivedQty}">0</td>
+                        <td class="num" th:text="${pl.remaining}">0</td>
+                        <td class="num" th:text="${pl.plannedQty == 0 ? '-' : (pl.receivedQty * 100 / pl.plannedQty) + '%'}">0%</td>
+                        <td><span class="badge" th:classappend="${'st-' + pl.statusOn(today)}" th:text="${pl.statusLabelOn(today)}">예정</span></td>
+                        <td><span class="badge src" th:text="${pl.source}">BASELINE</span></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(plans)}">
+                        <td colspan="8" class="muted">조회 조건에 맞는 입고 예정이 없습니다.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<script th:inline="none">
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.fill-in');
+        if (!btn) {
+            return;
+        }
+        const form = document.getElementById('inForm');
+        form.productId.value = btn.dataset.product;
+        form.qty.value = btn.dataset.qty;
+        form.qty.focus();
+        form.qty.select();
+    });
+</script>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

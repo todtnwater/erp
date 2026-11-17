@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ssk.erp.dao.StockTxDAO">
+
+    <sql id="columns">
+        t.id, t.product_id, p.code AS product_code, p.name AS product_name, p.unit AS product_unit,
+        t.plan_id, t.tx_type, t.qty, t.before_qty, t.after_qty, t.actor, t.channel,
+        t.reason_code, t.memo, t.created_at
+    </sql>
+
+    <select id="findRecent" resultType="com.ssk.erp.dto.StockTxDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_stock_tx t
+        JOIN erp_product p ON p.id = t.product_id
+        ORDER BY t.id DESC
+        FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <select id="findSince" resultType="com.ssk.erp.dto.StockTxDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_stock_tx t
+        JOIN erp_product p ON p.id = t.product_id
+        WHERE t.created_at &gt;= #{from}
+        ORDER BY t.id DESC
+    </select>
+
+    <select id="findBetween" resultType="com.ssk.erp.dto.StockTxDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_stock_tx t
+        JOIN erp_product p ON p.id = t.product_id
+        WHERE t.created_at &gt;= #{from}
+          AND t.created_at &lt; #{to}
+        ORDER BY t.created_at, t.id
+    </select>
+
+    <select id="averageInQty" resultType="java.lang.Double">
+        SELECT AVG(qty)
+        FROM erp_stock_tx
+        WHERE product_id = #{productId}
+          AND tx_type = 'IN'
+          AND created_at &gt;= #{from}
+    </select>
+
+    <insert id="insert" parameterType="com.ssk.erp.dto.StockTxDTO" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO erp_stock_tx (product_id, plan_id, tx_type, qty, before_qty, after_qty,
+                                  actor, channel, reason_code, memo, created_at)
+        VALUES (#{productId}, #{planId, jdbcType=NUMERIC}, #{txType}, #{qty}, #{beforeQty}, #{afterQty},
+                #{actor}, #{channel}, #{reasonCode, jdbcType=VARCHAR}, #{memo, jdbcType=VARCHAR}, #{createdAt})
+    </insert>
+</mapper>

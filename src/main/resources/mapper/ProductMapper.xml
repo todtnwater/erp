@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ssk.erp.dao.ProductDAO">
+
+    <sql id="columns">
+        id, code, name, category, origin, unit, kg_per_box, boxes_per_pallet,
+        description, stock_qty, safety_qty, location, updated_at
+    </sql>
+
+    <select id="findAll" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        ORDER BY code
+    </select>
+
+    <select id="findLow" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        WHERE stock_qty &lt; safety_qty
+        ORDER BY (stock_qty - safety_qty)
+    </select>
+
+    <select id="findById" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByCode" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        WHERE UPPER(code) = UPPER(#{code})
+    </select>
+
+    <select id="searchByKeyword" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        WHERE UPPER(name) LIKE '%' || UPPER(#{keyword}) || '%'
+           OR UPPER(code) LIKE '%' || UPPER(#{keyword}) || '%'
+           OR UPPER(description) LIKE '%' || UPPER(#{keyword}) || '%'
+        ORDER BY code
+    </select>
+
+    <select id="findByIdForUpdate" resultType="com.ssk.erp.dto.ProductDTO">
+        SELECT <include refid="columns"/>
+        FROM erp_product
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="updateStock">
+        UPDATE erp_product
+        SET stock_qty = #{stockQty},
+            updated_at = SYSTIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insert" parameterType="com.ssk.erp.dto.ProductDTO" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO erp_product (code, name, category, origin, unit, kg_per_box, boxes_per_pallet,
+                                 description, stock_qty, safety_qty, location, updated_at)
+        VALUES (#{code}, #{name}, #{category}, #{origin}, #{unit}, #{kgPerBox}, #{boxesPerPallet},
+                #{description}, #{stockQty}, #{safetyQty}, #{location}, SYSTIMESTAMP)
+    </insert>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM erp_product
+    </select>
+</mapper>

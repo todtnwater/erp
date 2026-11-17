@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('재고 현황')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('stock')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>재고 현황</h1>
+                <div class="desc">상자 · kg · 팔레트 환산과 안전재고 대비 부족 여부</div>
+            </div>
+            <div class="form">
+                <a th:href="@{/stock}"><button type="button" th:class="${lowOnly} ? 'ghost' : ''" th:text="'전체 ' + ${total}">전체</button></a>
+                <a th:href="@{/stock(lowOnly=true)}"><button type="button" th:class="${lowOnly} ? '' : 'ghost'" th:text="'부족만 ' + ${lowCount}">부족만</button></a>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments :: flash}"></div>
+
+        <section class="card">
+            <h2>냉장 창고 사용률
+                <span class="muted" th:text="${usage.usedPallets()} + ' / ' + ${usage.capacity()} + ' 팔레트 (T11) · 냉장 구역 200㎡'">0 / 82</span>
+            </h2>
+            <div class="usage">
+                <div class="bar" th:classappend="${usage.percent() >= 80} ? 'hot' : ''">
+                    <div th:style="|width: ${usage.percent() > 100 ? 100 : usage.percent()}%|"></div>
+                </div>
+                <b th:text="${usage.percent()} + '%'">0%</b>
+            </div>
+            <div class="form" style="margin-top:10px">
+                <span th:each="c : ${usage.byCategory()}" class="badge src" th:text="${c.key} + ' ' + ${c.value} + ' 팔레트'">귤</span>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>품목별 재고</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>코드</th>
+                        <th>상품명</th>
+                        <th>품목</th>
+                        <th>산지</th>
+                        <th>재고(상자)</th>
+                        <th>재고(kg)</th>
+                        <th>안전재고</th>
+                        <th>부족분</th>
+                        <th>팔레트</th>
+                        <th>위치</th>
+                        <th>상태</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="p : ${products}" th:classappend="${p.low} ? 'low' : ''">
+                        <td th:text="${p.code}">MK-EHM</td>
+                        <td th:text="${p.name}">상품</td>
+                        <td th:text="${p.category}">귤</td>
+                        <td th:text="${p.origin}">愛媛</td>
+                        <td class="num" th:text="${p.stockQty}">0</td>
+                        <td class="num" th:text="${#numbers.formatInteger(p.stockQty * p.kgPerBox, 1, 'COMMA')}">0</td>
+                        <td class="num" th:text="${p.safetyQty}">0</td>
+                        <td class="num" th:text="${p.low} ? ${p.safetyQty - p.stockQty} : '-'">-</td>
+                        <td class="num" th:text="${p.pallets}">0</td>
+                        <td th:text="${p.location}">C1</td>
+                        <td>
+                            <span th:if="${p.low}" class="badge low">부족</span>
+                            <span th:unless="${p.low}" class="badge ok">정상</span>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(products)}">
+                        <td colspan="11" class="muted">표시할 재고가 없습니다.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>

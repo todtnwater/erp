@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('출고 처리')}"></head>
+<body>
+<div class="app">
+    <aside th:replace="~{fragments :: sidebar('outbound')}"></aside>
+
+    <main id="main" class="main">
+        <div class="page-head">
+            <div>
+                <h1>출고 처리</h1>
+                <div class="desc">현재 재고보다 많이 출고할 수 없습니다 (재고가 마이너스가 되는 실수 차단)</div>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments :: flash}"></div>
+
+        <section class="card">
+            <h2>출고 등록 <span class="muted">아래 재고 표의 [출고] 버튼을 누르면 상품이 선택됩니다</span></h2>
+            <form id="outForm" class="form" th:action="@{/stock}" method="post">
+                <input type="hidden" name="txType" value="OUT">
+                <input type="hidden" name="back" value="/outbound">
+                <select name="productId" required>
+                    <option th:each="p : ${products}" th:value="${p.id}"
+                            th:text="${p.code + ' ' + p.name + ' (재고 ' + p.stockQty + ')'}">상품</option>
+                </select>
+                <input type="number" name="qty" min="1" max="10000" placeholder="상자 수" required>
+                <input type="text" name="memo" maxlength="100" placeholder="출고처 / 메모">
+                <button type="submit">출고 등록</button>
+            </form>
+            <div class="muted" style="margin-top:8px">처리자 <b th:text="${loginUser.name()}">이름</b> (로그인 계정으로 기록)</div>
+        </section>
+
+        <div class="grid2">
+            <section class="card">
+                <h2>출고 가능 재고</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>상품</th>
+                            <th>재고</th>
+                            <th>안전재고</th>
+                            <th>위치</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="p : ${products}" th:classappend="${p.low} ? 'low' : ''">
+                            <td th:text="${p.code + ' ' + p.name}">상품</td>
+                            <td class="num" th:text="${p.stockQty}">0</td>
+                            <td class="num" th:text="${p.safetyQty}">0</td>
+                            <td th:text="${p.location}">C1</td>
+                            <td>
+                                <button type="button" class="small ghost fill-out" th:if="${p.stockQty > 0}"
+                                        th:attr="data-product=${p.id}">출고</button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>최근 출고 <span class="muted">최근 7일</span></h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>일시</th>
+                            <th>상품</th>
+                            <th>상자</th>
+                            <th>변경</th>
+                            <th>처리자</th>
+                            <th>메모</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="t : ${outTx}">
+                            <td th:text="${#temporals.format(t.createdAt, 'MM-dd HH:mm')}">11-16 10:00</td>
+                            <td th:text="${t.productCode + ' ' + t.productName}">상품</td>
+                            <td class="num" th:text="${t.qty}">0</td>
+                            <td th:text="${t.beforeQty + ' → ' + t.afterQty}">0 → 0</td>
+                            <td th:text="${t.actor}">담당자</td>
+                            <td th:text="${t.memo}">메모</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(outTx)}">
+                            <td colspan="6" class="muted">최근 7일 출고가 없습니다.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <section th:replace="~{fragments :: chat}"></section>
+</div>
+<script th:inline="none">
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.fill-out');
+        if (!btn) {
+            return;
+        }
+        const form = document.getElementById('outForm');
+        form.productId.value = btn.dataset.product;
+        form.qty.focus();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    });
+</script>
+<th:block th:replace="~{fragments :: scripts}"></th:block>
+</body>
+</html>
